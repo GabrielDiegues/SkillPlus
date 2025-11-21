@@ -132,12 +132,6 @@ const Login = (props: NativeStackScreenProps<AppStackParamList>) => {
             disabled={isLogin}
           />
 
-          <FormButton
-            buttonTitle={"Test"}
-            onPressFunction={test}
-            disabled={isLogin}
-          />
-
           <TouchableOpacity style={globalStyles.centeredText}>
             <Text style={globalStyles.linkText}>Forgot Password?</Text>
           </TouchableOpacity>

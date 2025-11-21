@@ -2,11 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { useEventContext } from "../context/eventContext";
 import { useScreenAlert } from "../utils/displayMessages";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { AppStackParamList, LearningPath, MainTabsParamList, SkillAssessmentItem } from "../types";
+import { AppStackParamList, LearningPath, MainTabsParamList, SkillAssessmentItem, Status, UserProgress } from "../types";
 import { getSkillAssessmentItems } from "../services/assessementService";
 import { FirebaseError } from "@firebase/util";
 import { getErrorMessage } from "../utils/errorMessages";
-import { StyleSheet, View, Text, ScrollView, Image, Pressable } from "react-native";
+import { StyleSheet, View, Text, ScrollView, Image, Pressable, TouchableOpacity } from "react-native";
 import FormButton from "../components/formButton";
 import { CommonActions, useFocusEffect } from "@react-navigation/native";
 import React from "react";
@@ -16,17 +16,19 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { getAllLearningPaths } from "../services/learningPathService";
 import LoadingScreen from "../components/loadingScreen";
 import { v4 as uuidv4 } from 'uuid';
+import { getAllFilteredUserProgresses, updateStatus } from "../services/userProgressService";
 
 // 1. Custom Type to hold merged data (AI Reason + Database Path Details)
 type EnrichedRecommendation = {
     id: string;
     reason: string;
     path: LearningPath;
+    progress: UserProgress;
 };
 
 // Outer variables
 // WARNING: Ideally move this key to a .env file or backend
-const genAI = new GoogleGenerativeAI("");
+const genAI = new GoogleGenerativeAI("AIzaSyDa4_XS3MknlIU99-mUVeKqjNrz7Tc8DTk");
 
 const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
     const { navigation } = props;
@@ -38,6 +40,45 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
     const [recommendations, setRecommendations] = useState<EnrichedRecommendation[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
+
+    const navigateToCourseDetails = (id: string) => {
+        navigation.dispatch(
+            CommonActions.reset({
+                index: 0,
+                routes: [{ name: "CourseDetails", params: { learningPathId: id } }]
+            }),
+        );
+    }
+
+    const navigateToLearningPath = async (learningPath: LearningPath, progressStatus: Status) => {
+
+        setIsLoading(true);
+        try {
+            if (progressStatus === Status.NotStarted) {
+                if (loggedUser) {
+                    const isSucceeded = await updateStatus(loggedUser.id, learningPath.id, Status.InProgress);
+                    isSucceeded ? navigateToCourseDetails(learningPath.id) : screenAlert("Erro", "Erro ao se conectar com o servidor. por favor tente novamente mais tarde");
+                }
+                else {
+                    navigateToLogin();
+                }
+            }
+            navigateToCourseDetails(learningPath.id);
+        }
+        catch (error) {
+            screenAlert(
+                "Erro",
+                error instanceof FirebaseError
+                    ? getErrorMessage(error.code)
+                    : `Erro ao se conectar com o servidor. por favor tente novamente mais tarde\n${error}`
+            );
+        }
+        finally {
+            setIsLoading(false);
+        }
+    }
+
+
     const navigateToLogin = () => {
         screenAlert("error", "Erro ao carregar usuário. Por favor, faça login novamente");
         navigation.dispatch(
@@ -47,6 +88,7 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
             }),
         );
     };
+
 
     const loadAiPicks = async (currentItems: SkillAssessmentItem[], currentPaths: LearningPath[]) => {
         try {
@@ -83,19 +125,23 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
             const responseText = result.response.text();
             const parsedData = JSON.parse(responseText);
 
-            if (parsedData.recommendations) {
+            if (parsedData.recommendations && loggedUser) {
                 const matchedRecommendations: EnrichedRecommendation[] = [];
+                const currentProgresses: UserProgress[] = await getAllFilteredUserProgresses(loggedUser.id, currentPaths);
 
                 // 4. MATCHING LOGIC: Join AI data with Local Data here, not in JSX
                 parsedData.recommendations.forEach((rec: any) => {
                     // Find the full path object in the array we already have
                     const foundPath = currentPaths.find(path => path.id === rec.learningPathId);
+                    const foundProgress = currentProgresses.find(progress => progress.learningPathId === rec.learningPathId);
 
-                    if (foundPath) {
+
+                    if (foundPath && foundProgress) {
                         matchedRecommendations.push({
                             id: uuidv4(), // Safe random ID for RN
                             reason: rec.reason,
-                            path: foundPath // We embed the full object
+                            path: foundPath, // We embed the full object
+                            progress: foundProgress,
                         });
                     }
                 });
@@ -134,7 +180,7 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
             }
         } catch (error) {
             screenAlert("Error", error instanceof FirebaseError ? getErrorMessage(error.code) : "Connection error.");
-            navigation.navigate("Home");
+            navigateToLogin();
         } finally {
             setIsLoading(false);
         }
@@ -142,7 +188,7 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
 
     useFocusEffect(
         useCallback(() => {
-            //loadData();
+            loadData();
         }, [])
     );
 
@@ -216,18 +262,49 @@ const AiPicks = (props: NativeStackScreenProps<MainTabsParamList>) => {
 
 
                                     <View style={styles.actions}>
-                                        <Pressable
-                                            style={styles.addButton}
-                                            onPress={() => { }}
+                                        <TouchableOpacity
+                                            // O estilo 'actionButton' agora é a nova base para o botão
+                                            style={styles.actionButton}
+                                            onPress={() => navigateToLearningPath(rec.path, rec.progress.status)}
                                         >
-                                            <Text style={styles.addButtonText}>Add to My Paths</Text>
-                                        </Pressable>
+                                            {rec.progress && rec.progress.status !== Status.NotStarted ? (
+                                                <View style={styles.progressContent}>
+                                                    {/* 1. Estado 'In Progress' ou 'Completed' */}
+                                                    {rec.progress.status !== Status.Completed ? (
+                                                        <>
+                                                            <View style={styles.progressIndicator}>
+                                                                <View style={styles.progressBar}>
+                                                                    <View
+                                                                        style={[
+                                                                            styles.progressFill,
+                                                                            { width: `${rec.progress.progressPercentage}%` },
+                                                                        ]}
+                                                                    />
+                                                                </View>
+                                                                <Text style={styles.progressText}>
+                                                                    {rec.progress.progressPercentage}% concluído
+                                                                </Text>
+                                                            </View>
+                                                            <Text style={styles.continueButtonText}>Continuar</Text>
+                                                        </>
+                                                    ) : (
+                                                        // 2. Estado 'Completed' (usando o estilo 'completedButton')
+                                                        <View style={styles.completedButton}>
+                                                            <Text style={styles.completedButtonText}>✅ Completed</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            ) : (
+                                                // 3. Estado 'Not Started' (usando o estilo 'addPathButtonText')
+                                                <Text style={styles.addPathButtonText}>➕ Add to paths</Text>
+                                            )}
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             </View>
                         ))}
                     </View>
-                </ScrollView>
+                </ScrollView >
             )
     )
 }
@@ -259,9 +336,95 @@ const styles = StyleSheet.create({
     pathMeta: { flexDirection: 'row', gap: 10, marginBottom: 16 },
     levelBadge: { backgroundColor: '#e3f2fd', color: '#0066cc', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, fontSize: 13, fontWeight: '600' },
     categoryBadge: { backgroundColor: '#f5f5f5', color: '#666', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, fontSize: 13, fontWeight: '600' },
-    actions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    addButton: { backgroundColor: '#0066cc', flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, gap: 8 },
-    addButtonText: { fontSize: 15, fontWeight: 'bold', color: '#fff' },
+    // Ajuste para o contêiner das ações - Agora o botão ocupa a largura total para mais destaque
+    actions: {
+        paddingTop: 10, // Adiciona um pequeno espaço antes do botão
+    },
+
+    // Estilo base para o botão de ação (Substitui 'addButton')
+    actionButton: {
+        width: '100%',
+        backgroundColor: '#0066cc', // Cor primária para o botão
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        alignItems: 'center', // Centraliza o conteúdo (texto ou barra de progresso)
+        justifyContent: 'center',
+        // Adiciona uma pequena sombra para efeito 3D (Opcional)
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+
+    // 3. Estilo para o texto no estado 'Not Started' (Substitui 'addButtonText')
+    addPathButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+
+    // 1. Contêiner para o conteúdo do progresso (barra + texto + botão 'Continuar')
+    progressContent: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+
+    // Contêiner para a barra de progresso e porcentagem
+    progressIndicator: {
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        flex: 1, // Permite que a seção de progresso ocupe o espaço restante
+        marginRight: 10,
+    },
+
+    // Estilo da barra de progresso
+    progressBar: {
+        width: '100%',
+        height: 8, // Ligeiramente mais grossa
+        backgroundColor: '#e0e0e0',
+        borderRadius: 4,
+        marginBottom: 4,
+    },
+
+    // Preenchimento da barra de progresso
+    progressFill: {
+        height: '100%',
+        backgroundColor: '#00cc66', // Cor Verde para Progresso (contraste com o azul do botão)
+        borderRadius: 4,
+    },
+
+    // Texto de porcentagem
+    progressText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#fff', // Branco, pois está sobre o botão azul
+    },
+
+    // Texto para o botão 'Continuar'
+    continueButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+
+    // 2. Estado Concluído (Substitui 'startButton' e 'startButtonText')
+    completedButton: {
+        width: '100%',
+        backgroundColor: '#00cc66', // Verde vibrante para Concluído
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    completedButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff', // Texto branco para contraste
+    },
 });
 
 export default AiPicks;

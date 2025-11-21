@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "662744464859",
+    "firebase_url": "https://skill-up-plus-31b46-default-rtdb.firebaseio.com",
+    "project_id": "skill-up-plus-31b46",
+    "storage_bucket": "skill-up-plus-31b46.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:662744464859:android:46984da5622eff79f2fbfe",
+        "android_client_info": {
+          "package_name": "com.anonymous.SkillUp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyZ79n1IszkflNCMe3VVHuZQhv7xwu-ic"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

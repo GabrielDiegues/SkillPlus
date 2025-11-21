@@ -64,6 +64,8 @@ const Paths = (props: NativeStackScreenProps<AppStackParamList>) => {
             setIsLoading(false);
         }
     }
+
+    
     const loadData = async () => {
         try {
             if (!loggedUser) {

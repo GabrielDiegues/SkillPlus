@@ -11,6 +11,7 @@ import FormButton from "../components/formButton";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEventContext } from "../context/eventContext";
 import { updateProgressPercentage, updateStatus } from "../services/userProgressService";
+import { CommonActions } from "@react-navigation/native";
 
 const CourseDetails = (props: NativeStackScreenProps<AppStackParamList, "CourseDetails">) => {
     // Inner variables
@@ -23,6 +24,13 @@ const CourseDetails = (props: NativeStackScreenProps<AppStackParamList, "CourseD
     const screenAlert = useScreenAlert();
 
     // Inner functions
+
+    const navigateToHome = () => {
+        return navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }],
+        });
+    };
     const navigateToLogin = () => {
         screenAlert("error", "Erro ao carregar usuário. Por favor, faça login novamente");
         navigation.reset({
@@ -30,6 +38,8 @@ const CourseDetails = (props: NativeStackScreenProps<AppStackParamList, "CourseD
             routes: [{ name: 'Login' }],
         });
     };
+
+
     const loadData = async () => {
         setIsLoading(true);
         try {
@@ -55,10 +65,10 @@ const CourseDetails = (props: NativeStackScreenProps<AppStackParamList, "CourseD
             }
             setIsLoading(true);
             const isUpdated = await updateStatus(loggedUser.id, learningPathId, Status.Completed) && await updateProgressPercentage(loggedUser.id, learningPathId, 100);
-            if(isUpdated) {
+            if (isUpdated) {
                 screenAlert("Course completed!", `Congratulations! You've completed the course ${learningPath?.title || ""}`);
                 navigation.pop();
-            } 
+            }
         }
         catch (error) {
             screenAlert(
@@ -108,7 +118,7 @@ const CourseDetails = (props: NativeStackScreenProps<AppStackParamList, "CourseD
                 <View style={{ flex: 1, marginRight: 10 }}>
                     <FormButton
                         buttonTitle="Go back"
-                        onPressFunction={() => navigation.pop()}
+                        onPressFunction={() => navigateToHome()}
                     />
                 </View>
 
