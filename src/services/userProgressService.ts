@@ -1,5 +1,5 @@
-import { get, ref } from "@firebase/database";
-import { LearningPath, UserProgress } from "../types";
+import { get, ref, set } from "@firebase/database";
+import { LearningPath, Status, User, UserProgress } from "../types";
 import { database } from "./firebaseConfig";
 import { LEARNING_PATH_TABLE, USER_PROGRESS_TABLE } from "../utils/tables";
 
@@ -7,10 +7,22 @@ const getAllFilteredUserProgresses = async (userId: string, filteredPaths: Learn
     try {
         const promises = filteredPaths.map(async (path) => {
             const snapShot = await get(ref(database, `${USER_PROGRESS_TABLE}${userId}/${path.id}`));
-            return snapShot.exists() ? snapShot.val() as UserProgress : null;
+            if(!snapShot.exists()) {
+                const newUserProgress: UserProgress = {
+                    id: `${userId}_${path.id}`,
+                    userId: userId,
+                    learningPathId: path.id,
+                    progressPercentage: 0,
+                    status: Status.NotStarted
+                }
+                await set(ref(database, `${USER_PROGRESS_TABLE}${userId}/${path.id}`), newUserProgress);
+                return newUserProgress;
+            }
+            else {
+                return snapShot.val() as UserProgress;
+            }
         });
-        const results = await Promise.all(promises);
-        return results.filter(Boolean) as UserProgress[];
+        return await Promise.all(promises);
     }
     catch (error) {
         throw error;
@@ -20,7 +32,7 @@ const getAllFilteredUserProgresses = async (userId: string, filteredPaths: Learn
 
 const getUserProgress = async (userId: string, learningPathId: string): Promise<UserProgress | null> => {
     try {
-        const snapShot = await get(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`))
+        const snapShot = await get(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`));
         return snapShot.exists() ? snapShot.val() as UserProgress : null;
     }
     catch {
@@ -28,4 +40,41 @@ const getUserProgress = async (userId: string, learningPathId: string): Promise<
     }
 }
 
-export { getAllFilteredUserProgresses, getUserProgress }
+
+const updateStatus = async (userId: string, learningPathId: string, newStatus: Status): Promise<boolean> => {
+    try {
+        const snapShot = await get(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`));
+        if(snapShot) {
+            const storedUser = snapShot.val() as UserProgress;
+            storedUser.status = newStatus;
+            await set(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`), storedUser);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    catch {
+        return false;
+    }
+}
+
+
+const updateProgressPercentage = async (userId: string, learningPathId: string, newProgressPercentage: number): Promise<boolean> => {
+    try {
+        const snapShot = await get(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`));
+        if(snapShot) {
+            const storedUser = snapShot.val() as UserProgress;
+            storedUser.progressPercentage = newProgressPercentage;
+            await set(ref(database, `${USER_PROGRESS_TABLE}${userId}/${learningPathId}`), storedUser);
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    catch {
+        return false;
+    }
+}
+export { getAllFilteredUserProgresses, getUserProgress, updateStatus, updateProgressPercentage }

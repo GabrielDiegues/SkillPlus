@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
-import { Categories, LearningPath, UserProgress } from "../types";
+import { AppStackParamList, Categories, LearningPath, Status, UserProgress } from "../types";
 import { getAllLearningPaths } from "../services/learningPathService";
 import { useEventContext } from "../context/eventContext";
 import { useScreenAlert } from "../utils/displayMessages";
 import { FirebaseError } from '@firebase/util';
 import { getErrorMessage } from "../utils/errorMessages";
-import { getAllFilteredUserProgresses, getUserProgress } from "../services/userProgressService";
+import { getAllFilteredUserProgresses, getUserProgress, updateStatus } from "../services/userProgressService";
 import { View, Text, TextInput, ScrollView, StyleSheet, Pressable, Image, TouchableOpacity } from "react-native";
 import LoadingScreen from "../components/loadingScreen";
 import MainTabsHeader from "../components/headerStyles/mainTabsHeader";
 import { Picker } from '@react-native-picker/picker';
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import React from "react";
 
-const Paths = () => {
+const Paths = (props: NativeStackScreenProps<AppStackParamList>) => {
+    const { navigation } = props;
     // Inner Variables
     const screenAlert = useScreenAlert();
     const { loggedUser, setLoggedUser } = useEventContext();
@@ -19,21 +23,51 @@ const Paths = () => {
     const [filteredPaths, setFilteredPaths] = useState<LearningPath[]>([]);
     const [userProgresses, setUserProgresses] = useState<UserProgress[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState<Categories | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<Categories>(Categories.All);
     const [showFilters, setShowFilters] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     // Inner functions
-    const navigateToLearningPath = (pathName: string) => {
-        switch(pathName) {
-            case "Introduction to AI":
-                
+    const navigateToLogin = () => {
+        screenAlert("error", "Por favor, tente logar novamente");
+        navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+        });
+    };
+
+
+    const navigateToLearningPath = async (learningPath: LearningPath, progressStatus: Status) => {
+
+        setIsLoading(true);
+        try {
+            if (progressStatus === Status.NotStarted) {
+                if (loggedUser) {
+                    const isSucceeded = await updateStatus(loggedUser.id, learningPath.id, Status.InProgress);
+                    isSucceeded ? navigation.navigate("CourseDetails", { learningPathId: learningPath.id }) : screenAlert("Erro", "Erro ao se conectar com o servidor. por favor tente novamente mais tarde");
+                }
+                else {
+                    navigateToLogin();
+                }
+            }
+            navigation.navigate("CourseDetails", { learningPathId: learningPath.id });
+        }
+        catch (error) {
+            screenAlert(
+                "Erro",
+                error instanceof FirebaseError
+                    ? getErrorMessage(error.code)
+                    : `Erro ao se conectar com o servidor. por favor tente novamente mais tarde\n${error}`
+            );
+        }
+        finally {
+            setIsLoading(false);
         }
     }
     const loadData = async () => {
         try {
             if (!loggedUser) {
-                screenAlert("error", "Por favor, tente logar novamente");
+                navigateToLogin();
                 return;
             }
             setIsLoading(true);
@@ -75,9 +109,11 @@ const Paths = () => {
         }
     }
     // useEffects
-    useEffect(() => {
-        loadData();
-    }, [])
+    useFocusEffect(
+        React.useCallback(() => {
+            loadData();
+        }, [])
+    );
 
 
     useEffect(() => {
@@ -126,47 +162,54 @@ const Paths = () => {
 
             <ScrollView style={styles.pathsList}>
                 {
-          filteredPaths.map((path) => {
-                    const progress = userProgresses.filter(userProgress => userProgress.learningPathId === path.id)[0];
-                    return (
-                        <TouchableOpacity
-                            key={path.id}
-                            style={styles.pathCard}
-                            onPress={() => {}}//handleStartPath(path) 
-                        >
-                            <Image source={{ uri: path.imageUrl }} style={styles.pathImage} />
-                            <View style={styles.pathContent}>
-                                <Text style={styles.pathTitle}>{path.title}</Text>
-                                <Text style={styles.pathDescription} numberOfLines={2}>
-                                    {path.description}
-                                </Text>
-                                <View style={styles.pathMeta}>
-                                    <Text style={styles.levelBadge}>{path.dificultyLevel}</Text>
-                                    <Text style={styles.categoryBadge}>{path.category}</Text>
-                                </View>
-                                {progress ? (
-                                    <View style={styles.progressSection}>
-                                        <View style={styles.progressBar}>
-                                            <View
-                                                style={[
-                                                    styles.progressFill,
-                                                    { width: `${progress.progressPercentage}%` },
-                                                ]}
-                                            />
+                    filteredPaths.map((path) => {
+                        const progress = userProgresses.filter(userProgress => userProgress.learningPathId === path.id)[0];
+                        return (
+                            <TouchableOpacity
+                                key={path.id}
+                                style={styles.pathCard}
+                                onPress={() => navigateToLearningPath(path, progress.status)}//handleStartPath(path)
+                                disabled={isLoading}
+                            >
+                                <Image source={{ uri: path.imageUrl }} style={styles.pathImage} />
+                                <View style={styles.pathContent}>
+                                    <Text style={styles.pathTitle}>{path.title}</Text>
+                                    <Text style={styles.pathDescription} numberOfLines={2}>
+                                        {path.description}
+                                    </Text>
+                                    <View style={styles.pathMeta}>
+                                        <Text style={styles.levelBadge}>{path.dificultyLevel}</Text>
+                                        <Text style={styles.categoryBadge}>{path.category}</Text>
+                                    </View>
+                                    {progress && progress.status !== Status.NotStarted ? (
+                                        <View style={styles.progressSection}>
+                                            <View style={styles.progressBar}>
+                                                <View
+                                                    style={[
+                                                        styles.progressFill,
+                                                        { width: `${progress.progressPercentage}%` },
+                                                    ]}
+                                                />
+                                            </View>
+                                            <Text style={styles.progressText}>
+                                                {progress.progressPercentage}% complete
+                                            </Text>
+
+                                            {progress && progress.status === Status.Completed &&
+                                                <View style={styles.startButton}>
+                                                    <Text style={styles.startButtonText}>Completed</Text>
+                                                </View>
+                                            }
                                         </View>
-                                        <Text style={styles.progressText}>
-                                            {progress.progressPercentage}% complete
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <View style={styles.startButton}>
-                                        <Text style={styles.startButtonText}>Start</Text>
-                                    </View>
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })}
+                                    ) : (
+                                        <View style={styles.startButton}>
+                                            <Text style={styles.startButtonText}>Start</Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    })}
             </ScrollView>
         </View>
     )

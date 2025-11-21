@@ -1,5 +1,7 @@
 import { NavigatorScreenParams } from "@react-navigation/native";
 
+
+
 type MainTabsParamList = {
     Home: undefined;
     Paths: undefined;
@@ -15,10 +17,16 @@ type MainTabsProps = {
 }
 
 
+type CourseDetailsProps = {
+    learningPathId: string;
+}
+
+
 type AppStackParamList = {
     Login: undefined;
     SignUp: undefined;
-    Home: MainTabsParamList;
+    MainTabs: MainTabsParamList;
+    CourseDetails: CourseDetailsProps;
 }
 
 

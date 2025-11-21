@@ -79,6 +79,13 @@ interface UserProgress {
 
 
 // Skill assessments related interfaces
+interface SkillQuestion {
+    id: string;
+    name: string;
+    category: SkillCategory;
+}
+
+
 interface SkillAssessment {
     readonly id: string;
     readonly userId: string;
@@ -92,7 +99,6 @@ interface SkillAssessmentItem {
     category: SkillCategory;
     rating: number;
 }
-
 
 
 // Achievements
@@ -120,6 +126,7 @@ interface LearningPath {
     category: Categories;
     dificultyLevel: DificultyLevels;
     imageUrl: string; 
+    content: string;
 }
 
 
@@ -127,7 +134,7 @@ interface LearningPath {
 interface Recommendation {
     readonly id: string;
     readonly userId: string;
-    readonly learningPathId: number;
+    readonly learningPathId: string;
     reason: string;
 }
 
@@ -144,8 +151,7 @@ export type {
   LearningPath,
   Recommendation,
   UserInterest,
-  Status,
-  SkillCategory
+  SkillQuestion
 };
 
-export {Categories}
+export {Categories, Status, SkillCategory}

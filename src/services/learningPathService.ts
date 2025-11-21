@@ -17,5 +17,14 @@ const getAllLearningPaths = async (): Promise<LearningPath[]> => {
     }
 }
 
+const getLearningPath = async (learningPathId: string): Promise<LearningPath | null> => {
+    try {
+        const snapShot = await(get(ref(database, `${LEARNING_PATH_TABLE}${learningPathId}`)))
+        return snapShot.exists() ? snapShot.val() as LearningPath : null;
+    }
+    catch {
+        return null;
+    }
+}
 
-export {getAllLearningPaths}
+export {getAllLearningPaths, getLearningPath}

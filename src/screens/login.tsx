@@ -35,10 +35,31 @@ const Login = (props: NativeStackScreenProps<AppStackParamList>) => {
   const navigateToHome = () => {
     return navigation.reset({
       index: 0,
-      routes: [{ name: 'Home' }],
+      routes: [{ name: 'MainTabs' }],
     });
   };
 
+
+  const test = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, "3@gmail.com", "123456");
+      const uid = userCredential.user.uid;
+      const storedUser = await getUser(uid);
+      if (storedUser) {
+        setLoggedUser(storedUser);
+        console.log(storedUser);
+        navigateToHome();
+      }
+    }
+    catch (error) {
+      screenAlert(
+        "Erro",
+        error instanceof FirebaseError
+          ? getErrorMessage(error.code)
+          : `Erro ao logar. Por favor, tente novamente mais tarde\n${error}`
+      );
+    }
+  }
 
   const checkLogin = async () => {
     setIsLogin(true);
@@ -108,6 +129,12 @@ const Login = (props: NativeStackScreenProps<AppStackParamList>) => {
           <FormButton
             buttonTitle={isLogin ? "Logging in..." : "Login"}
             onPressFunction={checkLogin}
+            disabled={isLogin}
+          />
+
+          <FormButton
+            buttonTitle={"Test"}
+            onPressFunction={test}
             disabled={isLogin}
           />
 

@@ -57,6 +57,7 @@ const SignUp = (props: NativeStackScreenProps<AppStackParamList>) => {
 
             try {
                 await set(ref(database, `/users/${userInfo.user.uid}`), registeredUser);
+                
                 screenAlert("Sucesso", "Conta criada com sucesso");
                 navigateToLogin();
             } catch (dbError) {
