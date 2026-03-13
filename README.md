@@ -123,18 +123,3 @@ O SkillUpPlus 2030+ foi projetado com base nos ODS da ONU:
 * **ODS 8 – Trabalho Decente e Crescimento Econômico**
 
 O objetivo é democratizar o acesso à educação e apoiar trabalhadores no desenvolvimento de competências essenciais para o futuro do trabalho.
-
----
-
-# 🤝 **Contribuindo**
-
-Contribuições são bem-vindas!
-Sinta-se à vontade para abrir PRs, issues ou sugerir melhorias.
-
----
-
-# 📜 **Licença**
-
-Este projeto é de uso acadêmico e educativo.
-
----
